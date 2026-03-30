@@ -81,10 +81,12 @@ async function fetchInitialData(isBackground = false) {
             firebaseDb.ref('users').once('value')
         ]);
         
-        const mData = mSnap.val();
-        const iData = iSnap.val();
-        const eData = eSnap.val();
-        const uData = uSnap.val();
+        const safeArray = (val) => val ? Object.values(val).filter(Boolean) : null;
+        
+        const mData = safeArray(mSnap.val());
+        const iData = safeArray(iSnap.val());
+        const eData = safeArray(eSnap.val());
+        const uData = safeArray(uSnap.val());
         
         let changed = false;
         
