@@ -23,10 +23,18 @@ const MEMBER_SEED = [
     [1, "KHALID HAJI VALASHERI", "971556715545", 250], [2, "ABDUL RASAK NEERMUNDA", "919656325030", null], [3, "LATHEEF KURIKKAL", null, null], [4, "MUSTHAFA KOLOTHUM THODIKA", null, null], [5, "HASEENA PULIKKAL", null, null], [6, "FAISAL PAPATTA", "918078075265", null], [7, "FIYAS PAPATTA", "918078718551", null], [8, "NM STORE", null, null], [9, "BAPUTTY KAKKA", "919747114850", null], [10, "HAKEEM KAKKA", "919946629197", null], [11, "RIYAS PP", "919447300080", null], [12, "ARIF KT", null, null], [13, "KUNJANI KAKKA OROMPURATH", null, null], [14, "JUNAISE VADAKKE THODIKA", "919020357418", null], [15, "MUHAMMED KUNJI EP", null, null], [16, "RAHEEM PP", "966531693696", null], [17, "SHOUKATH VADAKKE THODIKA", null, null], [18, "NABEEL JAFAR OROMPURATH", "919061400850", null], [19, "RAHMATHULLA MUNNALINGAL", null, null], [20, "HASRATH ALI OROMPURATH", null, null], [21, "JUNAISE KT", null, null], [22, "ANEES KT", "916282756921", null], [23, "HAMEED KT", null, null], [24, "SALEEM KT", null, null], [25, "AZEES VADAKKE THODIKA", null, null], [26, "NOUSHAD KT", null, null], [27, "SALIM KAPPAKKUNNAN", null, 300], [28, "SHAREEF KAPPAKKUNNAN", "919048487191", 200], [29, "HASEENA KAPPAKKUNNAN", null, null], [30, "JABIR KAPPAKKUNNAN", "919745878410", null], [31, "SHIHABUDHEEN KAPPAKKUNNAN", null, null], [32, "SULAIKHA KAPPAKKUNNAN", null, null], [33, "RAHOOF KAPPAKKUNNAN", "919539520750", null], [34, "RAHMATH KAPPAKKUNNAN", null, null], [35, "ABDUL NASAR OROMPURATH", "916282529858", null], [36, "JASMAL CK", "919605684153", null], [37, "SALEEM THALAPPIL", null, 150], [38, "NASAR THALAPPIL", "918078027434", null], [39, "HAMSA KOZHUVAMMAL", null, null], [40, "JALEEL KAPPAKKUNNAN", "919961703255", null], [41, "MOIDEEN VIDIYATH", null, null], [42, "ANEES BABU KP", "919526816002", 200], [43, "CHERIYAPPU KAPPIL", null, null], [44, "MUHAMMED NELLENGARA", null, null], [45, "ABDUL MAJEED KP", "919947718452", 200], [46, "SALAM KAPPAKKUNNAN", null, null], [47, "GAFOOR KAPPAKKUNNAN", "917025520335", null], [48, "CHERIYAMAN KAPPIL", "919447307912", null], [49, "MAJEED VADAKKE THODIKA", null, null], [50, "BASHEER VADAKKE THODIKA", null, null], [51, "SULAIKHA VADAKKE THODIKA", null, null], [52, "AZEES KT", null, null], [53, "SHANAVAS VADAKKE THODIKA", "966502632648", null], [54, "ILYAS VA", "918547325453", null], [55, "KADHEER VA", "919447681996", null], [56, "ABUL AHLA VA", null, null], [57, "RAMSHAD NACHIYAN", "918086002007", null], [58, "FAISAL MUKKANNAN", null, null], [59, "LATHEEF PULIKKAL", "919446705536", null], [60, "MUSTHAFA PULIKKAL", "919496905720", null], [61, "JAMEELA PULIKKAL", null, null], [62, "MUJEEB PULIKKAL", null, null]
 ];
 
-// --- 2. DB LAYER (Supabase + Local Cache) ---
-const SUPABASE_URL = "https://fqrxizfhtoejukgogfne.supabase.co";
-const SUPABASE_KEY = "sb_publishable_yYgNS9OdxRRY0u9kmCg9tw_tASWKAIG";
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// --- 2. DB LAYER (Firebase + Local Cache) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDMdCnCkJQGNwr44wIpxdV4-TN7Ldyycrc",
+  authDomain: "mosque-management-18569.firebaseapp.com",
+  databaseURL: "https://mosque-management-18569-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "mosque-management-18569",
+  storageBucket: "mosque-management-18569.firebasestorage.app",
+  messagingSenderId: "861420140072",
+  appId: "1:861420140072:web:de5cf9034ea09a0e29271d"
+};
+firebase.initializeApp(firebaseConfig);
+const firebaseDb = firebase.database();
 
 let appState = { members: null, income: null, expense: null, users: null };
 
@@ -52,33 +60,37 @@ function setDb(key, val) {
     }
     appState[key] = val;
     localStorage.setItem(`mosque_cache_${key}`, JSON.stringify(val));
-    syncToSupabase(key, val);
+    syncToFirebase(key, val);
 }
 
-async function syncToSupabase(table, dataArray) {
+async function syncToFirebase(table, dataArray) {
     try {
         if (!Array.isArray(dataArray) || dataArray.length === 0) return;
-        const { error } = await supabaseClient.from(table).upsert(dataArray);
-        if (error) console.error(`Sync error for ${table}:`, error);
+        await firebaseDb.ref(table).set(dataArray);
     } catch(err) {
-        console.error(err);
+        console.error(`Sync error for ${table}:`, err);
     }
 }
 
 async function fetchInitialData(isBackground = false) {
     try {
-        const [mRes, iRes, eRes, uRes] = await Promise.all([
-            supabaseClient.from('members').select('*'),
-            supabaseClient.from('income').select('*'),
-            supabaseClient.from('expense').select('*'),
-            supabaseClient.from('users').select('*')
+        const [mSnap, iSnap, eSnap, uSnap] = await Promise.all([
+            firebaseDb.ref('members').once('value'),
+            firebaseDb.ref('income').once('value'),
+            firebaseDb.ref('expense').once('value'),
+            firebaseDb.ref('users').once('value')
         ]);
         
+        const mData = mSnap.val();
+        const iData = iSnap.val();
+        const eData = eSnap.val();
+        const uData = uSnap.val();
+        
         let changed = false;
-        if (mRes.data && mRes.data.length >= 0) { appState.members = mRes.data; localStorage.setItem('mosque_cache_members', JSON.stringify(appState.members)); changed = true; }
-        if (iRes.data && iRes.data.length >= 0) { appState.income = iRes.data; localStorage.setItem('mosque_cache_income', JSON.stringify(appState.income)); changed = true; }
-        if (eRes.data && eRes.data.length >= 0) { appState.expense = eRes.data; localStorage.setItem('mosque_cache_expense', JSON.stringify(appState.expense)); changed = true; }
-        if (uRes.data && uRes.data.length >= 0) { appState.users = uRes.data; localStorage.setItem('mosque_cache_users', JSON.stringify(appState.users)); changed = true; }
+        if (mData) { appState.members = mData; localStorage.setItem('mosque_cache_members', JSON.stringify(appState.members)); changed = true; }
+        if (iData) { appState.income = iData; localStorage.setItem('mosque_cache_income', JSON.stringify(appState.income)); changed = true; }
+        if (eData) { appState.expense = eData; localStorage.setItem('mosque_cache_expense', JSON.stringify(appState.expense)); changed = true; }
+        if (uData) { appState.users = uData; localStorage.setItem('mosque_cache_users', JSON.stringify(appState.users)); changed = true; }
         
         if (isBackground && changed && currentUser) {
             const appEl = document.getElementById('page-content');
@@ -671,7 +683,7 @@ function saveIncome(e, editId) {
 
 async function deleteIncome(id) {
     if(!confirm('Are you sure you want to delete this record?')) return;
-    try { await supabaseClient.from('income').delete().eq('id', id); } catch(e) {}
+    // Firebase delete is handled by syncing the new array using setDb.
     let incomes = getDb('income', []);
     incomes = incomes.filter(i => i.id !== id);
     setDb('income', incomes);
@@ -807,7 +819,7 @@ function saveExpense(e, editId) {
 
 async function deleteExpense(id) {
     if(!confirm('Are you sure you want to delete this record?')) return;
-    try { await supabaseClient.from('expense').delete().eq('id', id); } catch(e) {}
+    // Firebase delete is handled by syncing the new array using setDb.
     let expenses = getDb('expense', []);
     expenses = expenses.filter(i => i.id !== id);
     setDb('expense', expenses);
@@ -1285,7 +1297,7 @@ window.deleteCommitteeUser = async function(phone) {
         return;
     }
     if (!confirm('Are you sure you want to remove this committee member?')) return;
-    try { await supabaseClient.from('users').delete().eq('phone', phone); } catch(e) {}
+    // Firebase delete is handled by syncing the new array using setDb.
     let users = getDb('users', USERS);
     users = users.filter(u => u.phone !== phone);
     setDb('users', users);
