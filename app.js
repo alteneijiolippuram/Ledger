@@ -23,30 +23,71 @@ const MEMBER_SEED = [
     [1, "KHALID HAJI VALASHERI", "971556715545", 250], [2, "ABDUL RASAK NEERMUNDA", "919656325030", null], [3, "LATHEEF KURIKKAL", null, null], [4, "MUSTHAFA KOLOTHUM THODIKA", null, null], [5, "HASEENA PULIKKAL", null, null], [6, "FAISAL PAPATTA", "918078075265", null], [7, "FIYAS PAPATTA", "918078718551", null], [8, "NM STORE", null, null], [9, "BAPUTTY KAKKA", "919747114850", null], [10, "HAKEEM KAKKA", "919946629197", null], [11, "RIYAS PP", "919447300080", null], [12, "ARIF KT", null, null], [13, "KUNJANI KAKKA OROMPURATH", null, null], [14, "JUNAISE VADAKKE THODIKA", "919020357418", null], [15, "MUHAMMED KUNJI EP", null, null], [16, "RAHEEM PP", "966531693696", null], [17, "SHOUKATH VADAKKE THODIKA", null, null], [18, "NABEEL JAFAR OROMPURATH", "919061400850", null], [19, "RAHMATHULLA MUNNALINGAL", null, null], [20, "HASRATH ALI OROMPURATH", null, null], [21, "JUNAISE KT", null, null], [22, "ANEES KT", "916282756921", null], [23, "HAMEED KT", null, null], [24, "SALEEM KT", null, null], [25, "AZEES VADAKKE THODIKA", null, null], [26, "NOUSHAD KT", null, null], [27, "SALIM KAPPAKKUNNAN", null, 300], [28, "SHAREEF KAPPAKKUNNAN", "919048487191", 200], [29, "HASEENA KAPPAKKUNNAN", null, null], [30, "JABIR KAPPAKKUNNAN", "919745878410", null], [31, "SHIHABUDHEEN KAPPAKKUNNAN", null, null], [32, "SULAIKHA KAPPAKKUNNAN", null, null], [33, "RAHOOF KAPPAKKUNNAN", "919539520750", null], [34, "RAHMATH KAPPAKKUNNAN", null, null], [35, "ABDUL NASAR OROMPURATH", "916282529858", null], [36, "JASMAL CK", "919605684153", null], [37, "SALEEM THALAPPIL", null, 150], [38, "NASAR THALAPPIL", "918078027434", null], [39, "HAMSA KOZHUVAMMAL", null, null], [40, "JALEEL KAPPAKKUNNAN", "919961703255", null], [41, "MOIDEEN VIDIYATH", null, null], [42, "ANEES BABU KP", "919526816002", 200], [43, "CHERIYAPPU KAPPIL", null, null], [44, "MUHAMMED NELLENGARA", null, null], [45, "ABDUL MAJEED KP", "919947718452", 200], [46, "SALAM KAPPAKKUNNAN", null, null], [47, "GAFOOR KAPPAKKUNNAN", "917025520335", null], [48, "CHERIYAMAN KAPPIL", "919447307912", null], [49, "MAJEED VADAKKE THODIKA", null, null], [50, "BASHEER VADAKKE THODIKA", null, null], [51, "SULAIKHA VADAKKE THODIKA", null, null], [52, "AZEES KT", null, null], [53, "SHANAVAS VADAKKE THODIKA", "966502632648", null], [54, "ILYAS VA", "918547325453", null], [55, "KADHEER VA", "919447681996", null], [56, "ABUL AHLA VA", null, null], [57, "RAMSHAD NACHIYAN", "918086002007", null], [58, "FAISAL MUKKANNAN", null, null], [59, "LATHEEF PULIKKAL", "919446705536", null], [60, "MUSTHAFA PULIKKAL", "919496905720", null], [61, "JAMEELA PULIKKAL", null, null], [62, "MUJEEB PULIKKAL", null, null]
 ];
 
-// --- 2. DB LAYER (Local Storage) ---
+// --- 2. DB LAYER (Supabase + Local Cache) ---
+const SUPABASE_URL = "https://fqrxizfhtoejukgogfne.supabase.co";
+const SUPABASE_KEY = "sb_publishable_yYgNS9OdxRRY0u9kmCg9tw_tASWKAIG";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let appState = { members: null, income: null, expense: null, users: null };
+
 function getDb(key, defaultVal) {
-    const data = localStorage.getItem(`mosque_${key}`);
-    return data ? JSON.parse(data) : defaultVal;
+    if (key === 'auth_user') {
+        const d = localStorage.getItem('mosque_auth_user');
+        return d ? JSON.parse(d) : defaultVal;
+    }
+    if (appState[key]) return appState[key];
+    
+    const d = localStorage.getItem(`mosque_cache_${key}`);
+    if (d) return JSON.parse(d);
+    
+    if (key === 'members') return MEMBER_SEED.map(m => ({ id: m[0], name: m[1], phone: m[2] || '', amount: m[3] || 0, subscriptions: {} }));
+    if (key === 'users') return USERS;
+    return defaultVal;
 }
 
 function setDb(key, val) {
-    localStorage.setItem(`mosque_${key}`, JSON.stringify(val));
+    if (key === 'auth_user') {
+        localStorage.setItem(`mosque_auth_user`, JSON.stringify(val));
+        return;
+    }
+    appState[key] = val;
+    localStorage.setItem(`mosque_cache_${key}`, JSON.stringify(val));
+    syncToSupabase(key, val);
 }
 
-// Ensure seeded members exist
-if (!localStorage.getItem('mosque_members')) {
-    const formatted = MEMBER_SEED.map(m => ({
-        id: m[0],
-        name: m[1],
-        phone: m[2] || '',
-        amount: m[3] || 0,
-        subscriptions: {} // { '2024-0': true, '2024-1': false } etc
-    }));
-    setDb('members', formatted);
+async function syncToSupabase(table, dataArray) {
+    try {
+        if (!Array.isArray(dataArray) || dataArray.length === 0) return;
+        const { error } = await supabaseClient.from(table).upsert(dataArray);
+        if (error) console.error(`Sync error for ${table}:`, error);
+    } catch(err) {
+        console.error(err);
+    }
 }
-if (!localStorage.getItem('mosque_income')) setDb('income', []);
-if (!localStorage.getItem('mosque_expense')) setDb('expense', []);
-if (!localStorage.getItem('mosque_users')) setDb('users', USERS);
+
+async function fetchInitialData() {
+    try {
+        const [mRes, iRes, eRes, uRes] = await Promise.all([
+            supabaseClient.from('members').select('*'),
+            supabaseClient.from('income').select('*'),
+            supabaseClient.from('expense').select('*'),
+            supabaseClient.from('users').select('*')
+        ]);
+        
+        if (mRes.data && mRes.data.length > 0) appState.members = mRes.data;
+        if (iRes.data && iRes.data.length > 0) appState.income = iRes.data;
+        if (eRes.data && eRes.data.length > 0) appState.expense = eRes.data;
+        if (uRes.data && uRes.data.length > 0) appState.users = uRes.data;
+        
+        // Populate cache
+        if (appState.members) localStorage.setItem('mosque_cache_members', JSON.stringify(appState.members));
+        if (appState.income) localStorage.setItem('mosque_cache_income', JSON.stringify(appState.income));
+        if (appState.expense) localStorage.setItem('mosque_cache_expense', JSON.stringify(appState.expense));
+        if (appState.users) localStorage.setItem('mosque_cache_users', JSON.stringify(appState.users));
+    } catch (err) {
+        console.error("Fetch Supabase failed:", err);
+    }
+}
 
 // --- 3. STATE ---
 let currentUser = getDb('auth_user', null);
@@ -1236,6 +1277,18 @@ window.deleteCommitteeUser = function(phone) {
 
 
 // --- INIT APP ---
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+    // Show splash loader
+    const ldg = document.createElement('div');
+    ldg.id = 'global-loader';
+    ldg.className = 'fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center transition-opacity duration-300';
+    ldg.innerHTML = `<i class="fa-solid fa-cloud-arrow-down fa-bounce text-4xl text-brand-500 mb-4"></i><p class="text-gray-500 font-medium animate-pulse">Syncing with Cloud...</p>`;
+    document.body.appendChild(ldg);
+    
+    await fetchInitialData();
+    
+    ldg.style.opacity = '0';
+    setTimeout(() => ldg.remove(), 300);
+    
     navigate('dashboard');
 });
