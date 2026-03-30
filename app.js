@@ -65,7 +65,7 @@ async function syncToSupabase(table, dataArray) {
     }
 }
 
-async function fetchInitialData() {
+async function fetchInitialData(isBackground = false) {
     try {
         const [mRes, iRes, eRes, uRes] = await Promise.all([
             supabaseClient.from('members').select('*'),
@@ -74,24 +74,38 @@ async function fetchInitialData() {
             supabaseClient.from('users').select('*')
         ]);
         
-        if (mRes.data && mRes.data.length > 0) appState.members = mRes.data;
-        if (iRes.data && iRes.data.length > 0) appState.income = iRes.data;
-        if (eRes.data && eRes.data.length > 0) appState.expense = eRes.data;
-        if (uRes.data && uRes.data.length > 0) appState.users = uRes.data;
+        let changed = false;
+        if (mRes.data && mRes.data.length >= 0) { appState.members = mRes.data; localStorage.setItem('mosque_cache_members', JSON.stringify(appState.members)); changed = true; }
+        if (iRes.data && iRes.data.length >= 0) { appState.income = iRes.data; localStorage.setItem('mosque_cache_income', JSON.stringify(appState.income)); changed = true; }
+        if (eRes.data && eRes.data.length >= 0) { appState.expense = eRes.data; localStorage.setItem('mosque_cache_expense', JSON.stringify(appState.expense)); changed = true; }
+        if (uRes.data && uRes.data.length >= 0) { appState.users = uRes.data; localStorage.setItem('mosque_cache_users', JSON.stringify(appState.users)); changed = true; }
         
-        // Populate cache
-        if (appState.members) localStorage.setItem('mosque_cache_members', JSON.stringify(appState.members));
-        if (appState.income) localStorage.setItem('mosque_cache_income', JSON.stringify(appState.income));
-        if (appState.expense) localStorage.setItem('mosque_cache_expense', JSON.stringify(appState.expense));
-        if (appState.users) localStorage.setItem('mosque_cache_users', JSON.stringify(appState.users));
+        if (isBackground && changed && currentUser) {
+            const appEl = document.getElementById('page-content');
+            if (appEl) {
+                if (currentPage === 'dashboard') renderDashboard(appEl);
+                if (currentPage === 'income') renderIncome(appEl);
+                if (currentPage === 'expense') renderExpense(appEl);
+                if (currentPage === 'members') renderMembers(appEl);
+                if (currentPage === 'reports') renderReports(appEl);
+                if (currentPage === 'committee') renderCommittee(appEl);
+            }
+        }
     } catch (err) {
         console.error("Fetch Supabase failed:", err);
     }
 }
 
+setInterval(() => {
+    if (currentUser) {
+        fetchInitialData(true);
+    }
+}, 3000);
+
 // --- 3. STATE ---
 let currentUser = getDb('auth_user', null);
 let currentModal = null;
+let currentPage = 'login';
 
 // --- 4. CORE UTILS ---
 const $ = (id) => document.getElementById(id);
@@ -109,6 +123,7 @@ function navigate(page) {
         page = 'dashboard';
     }
     
+    currentPage = page;
     const appEl = $('app');
     appEl.innerHTML = '';
     
@@ -654,8 +669,9 @@ function saveIncome(e, editId) {
     navigate('income'); 
 }
 
-function deleteIncome(id) {
+async function deleteIncome(id) {
     if(!confirm('Are you sure you want to delete this record?')) return;
+    try { await supabaseClient.from('income').delete().eq('id', id); } catch(e) {}
     let incomes = getDb('income', []);
     incomes = incomes.filter(i => i.id !== id);
     setDb('income', incomes);
@@ -789,8 +805,9 @@ function saveExpense(e, editId) {
     navigate('expense');
 }
 
-function deleteExpense(id) {
+async function deleteExpense(id) {
     if(!confirm('Are you sure you want to delete this record?')) return;
+    try { await supabaseClient.from('expense').delete().eq('id', id); } catch(e) {}
     let expenses = getDb('expense', []);
     expenses = expenses.filter(i => i.id !== id);
     setDb('expense', expenses);
@@ -1262,13 +1279,13 @@ window.saveCommitteeUser = function(e, editPhone) {
     navigate('committee');
 };
 
-window.deleteCommitteeUser = function(phone) {
+window.deleteCommitteeUser = async function(phone) {
     if (phone === currentUser.phone) {
         alert("You cannot delete your own account.");
         return;
     }
     if (!confirm('Are you sure you want to remove this committee member?')) return;
-    
+    try { await supabaseClient.from('users').delete().eq('phone', phone); } catch(e) {}
     let users = getDb('users', USERS);
     users = users.filter(u => u.phone !== phone);
     setDb('users', users);
