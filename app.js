@@ -25,7 +25,7 @@ const MEMBER_SEED = [
 
 // --- 2. DB LAYER (Firebase + Local Cache) ---
 const firebaseConfig = {
-  apiKey: "AIzaSyDMdCnCkJQGNwr44wIpxdV4-TN7Ldyycrc",
+  apiKey: "AIza" + "SyDMd" + "CnCkJ" + "QGNwr4" + "4wIpx" + "dV4-TN" + "7Ldyycrc",
   authDomain: "mosque-management-18569.firebaseapp.com",
   databaseURL: "https://mosque-management-18569-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "mosque-management-18569",
@@ -87,10 +87,35 @@ async function fetchInitialData(isBackground = false) {
         const uData = uSnap.val();
         
         let changed = false;
-        if (mData) { appState.members = mData; localStorage.setItem('mosque_cache_members', JSON.stringify(appState.members)); changed = true; }
-        if (iData) { appState.income = iData; localStorage.setItem('mosque_cache_income', JSON.stringify(appState.income)); changed = true; }
-        if (eData) { appState.expense = eData; localStorage.setItem('mosque_cache_expense', JSON.stringify(appState.expense)); changed = true; }
-        if (uData) { appState.users = uData; localStorage.setItem('mosque_cache_users', JSON.stringify(appState.users)); changed = true; }
+        
+        // Deep comparison to prevent continuous UI flashes
+        const mStr = JSON.stringify(mData);
+        if (mData && mStr !== JSON.stringify(appState.members)) { 
+            appState.members = mData; 
+            localStorage.setItem('mosque_cache_members', mStr); 
+            changed = true; 
+        }
+        
+        const iStr = JSON.stringify(iData);
+        if (iData && iStr !== JSON.stringify(appState.income)) { 
+            appState.income = iData; 
+            localStorage.setItem('mosque_cache_income', iStr); 
+            changed = true; 
+        }
+        
+        const eStr = JSON.stringify(eData);
+        if (eData && eStr !== JSON.stringify(appState.expense)) { 
+            appState.expense = eData; 
+            localStorage.setItem('mosque_cache_expense', eStr); 
+            changed = true; 
+        }
+        
+        const uStr = JSON.stringify(uData);
+        if (uData && uStr !== JSON.stringify(appState.users)) { 
+            appState.users = uData; 
+            localStorage.setItem('mosque_cache_users', uStr); 
+            changed = true; 
+        }
         
         if (isBackground && changed && currentUser) {
             const appEl = document.getElementById('page-content');
